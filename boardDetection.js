@@ -1,14 +1,14 @@
 /**
  * Board Detection from Screenshot
- * Identifies 8x8 grid elements from uploaded image
+ * Identifies 8x8 grid elements from uploaded image using icon/sprite recognition
  */
 
 class BoardDetector {
     constructor() {
         this.tileSize = 0;
         this.boardOffset = { x: 0, y: 0 };
-        this.elementColors = {};
         this.detectedElements = [];
+        this.elementTemplates = new Map();
     }
 
     /**
@@ -54,7 +54,7 @@ class BoardDetector {
         this.tileSize = Math.round(boardArea.width / 8);
         this.boardOffset = { x: boardArea.x, y: boardArea.y };
 
-        // Extract the board grid
+        // Extract the board grid with icon recognition
         const board = this.extractBoardGrid(ctx);
 
         return board;
@@ -114,29 +114,43 @@ class BoardDetector {
     }
 
     /**
-     * Extract 8x8 grid of elements from image
+     * Extract 8x8 grid of elements from image with icon recognition
      */
     extractBoardGrid(ctx) {
         const board = [];
-        const colorClusters = {}; // Group similar colors
+        const iconSignatures = {}; // Map icon signatures to element IDs
         let elementId = 0;
 
+        // First pass: collect all tile signatures
         for (let r = 0; r < 8; r++) {
             const row = [];
             for (let c = 0; c < 8; c++) {
                 const tileX = this.boardOffset.x + c * this.tileSize;
                 const tileY = this.boardOffset.y + r * this.tileSize;
 
-                const color = this.getTileDominantColor(ctx, tileX, tileY, this.tileSize);
+                const signature = this.getTileSignature(ctx, tileX, tileY, this.tileSize);
 
-                // Check if tile is empty (very light - background)
-                if (this.isEmptyTile(color)) {
+                if (this.isEmptyTile(signature)) {
                     row.push(null);
                 } else {
-                    // Find or create color cluster
-                    const clusterId = this.findColorCluster(color, colorClusters);
-                    row.push(clusterId);
-                    this.detectedElements[clusterId] = { color, name: `Element ${clusterId}` };
+                    // Find or create element ID for this signature
+                    const sigKey = JSON.stringify(signature);
+                    
+                    if (!iconSignatures[sigKey]) {
+                        iconSignatures[sigKey] = elementId++;
+                    }
+                    
+                    const id = iconSignatures[sigKey];
+                    row.push(id);
+                    
+                    // Store element info
+                    if (!this.detectedElements[id]) {
+                        this.detectedElements[id] = {
+                            signature,
+                            color: signature.dominantColor,
+                            name: `Element ${id}`
+                        };
+                    }
                 }
             }
             board.push(row);
@@ -145,84 +159,4 @@ class BoardDetector {
         return board;
     }
 
-    /**
-     * Find or create color cluster for similar colors
-     */
-    findColorCluster(color, clusters, threshold = 40) {
-        // Check existing clusters
-        for (const [clusterId, clusterColor] of Object.entries(clusters)) {
-            if (this.colorDistance(color, clusterColor) < threshold) {
-                return parseInt(clusterId);
-            }
-        }
-
-        // Create new cluster
-        const newId = Object.keys(clusters).length;
-        clusters[newId] = color;
-        return newId;
-    }
-
-    /**
-     * Calculate Euclidean distance between two RGB colors
-     */
-    colorDistance(color1, color2) {
-        const dr = color1.r - color2.r;
-        const dg = color1.g - color2.g;
-        const db = color1.b - color2.b;
-        return Math.sqrt(dr * dr + dg * dg + db * db);
-    }
-
-    /**
-     * Get dominant color in a tile
-     */
-    getTileDominantColor(ctx, x, y, size) {
-        try {
-            const imageData = ctx.getImageData(x, y, size, size);
-            const data = imageData.data;
-
-            let r = 0, g = 0, b = 0, count = 0;
-
-            // Sample every 4th pixel to speed up
-            for (let i = 0; i < data.length; i += 16) {
-                r += data[i];
-                g += data[i + 1];
-                b += data[i + 2];
-                count++;
-            }
-
-            if (count === 0) return { r: 200, g: 200, b: 200 };
-
-            return {
-                r: Math.round(r / count),
-                g: Math.round(g / count),
-                b: Math.round(b / count)
-            };
-        } catch (error) {
-            // Out of bounds - return neutral color
-            return { r: 200, g: 200, b: 200 };
-        }
-    }
-
-    /**
-     * Check if tile is empty (light colored background)
-     */
-    isEmptyTile(color) {
-        const brightness = (color.r + color.g + color.b) / 3;
-        // Check if it's very light (background) or very similar to green background
-        const isLight = brightness > 200;
-        const isGreen = color.g > color.r && color.g > color.b && color.g > 150;
-        return isLight || isGreen;
-    }
-
-    /**
-     * Get detected elements
-     */
-    getElements() {
-        return this.detectedElements;
-    }
-}
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = BoardDetector;
-}
+    /**\n     * Get a multi-feature signature of a tile for icon recognition\n     */\n    getTileSignature(ctx, x, y, size) {\n        try {\n            const imageData = ctx.getImageData(x, y, size, size);\n            const data = imageData.data;\n\n            // Extract multiple features for better icon recognition\n            let r = 0, g = 0, b = 0;\n            let edgePixels = 0;\n            let centerPixels = 0;\n            let colorVariance = 0;\n            const colorBuckets = {}; // Histogram of colors\n            let count = 0;\n\n            // Analyze pixels with stride for efficiency\n            for (let i = 0; i < data.length; i += 16) {\n                const pr = data[i];\n                const pg = data[i + 1];\n                const pb = data[i + 2];\n\n                r += pr;\n                g += pg;\n                b += pb;\n\n                // Quantize color to bucket (for histogram)\n                const colorKey = `${Math.floor(pr / 50)},${Math.floor(pg / 50)},${Math.floor(pb / 50)}`;\n                colorBuckets[colorKey] = (colorBuckets[colorKey] || 0) + 1;\n\n                count++;\n            }\n\n            if (count === 0) {\n                return { brightness: 200, dominantColor: { r: 200, g: 200, b: 200 } };\n            }\n\n            const avgR = Math.round(r / count);\n            const avgG = Math.round(g / count);\n            const avgB = Math.round(b / count);\n\n            // Calculate color variance (how many different colors in tile)\n            const uniqueColors = Object.keys(colorBuckets).length;\n\n            return {\n                dominantColor: { r: avgR, g: avgG, b: avgB },\n                brightness: (avgR + avgG + avgB) / 3,\n                uniqueColors,\n                colorProfile: Object.entries(colorBuckets)\n                    .sort((a, b) => b[1] - a[1])\n                    .slice(0, 3) // Top 3 colors\n                    .map(([key, count]) => key)\n            };\n        } catch (error) {\n            return { brightness: 200, dominantColor: { r: 200, g: 200, b: 200 } };\n        }\n    }\n\n    /**\n     * Check if tile is empty (light colored background)\n     */\n    isEmptyTile(signature) {\n        const brightness = signature.brightness || 200;\n        const dominantColor = signature.dominantColor || {};\n\n        // Very light (background) or very green (board background)\n        const isLight = brightness > 200;\n        const isGreen = (dominantColor.g || 0) > (dominantColor.r || 0) &&\n                        (dominantColor.g || 0) > (dominantColor.b || 0) &&\n                        (dominantColor.g || 0) > 150;\n\n        return isLight || isGreen;\n    }\n\n    /**\n     * Get detected elements\n     */\n    getElements() {\n        return this.detectedElements.filter(el => el !== undefined);\n    }\n}\n\n// Export for use in other modules\nif (typeof module !== 'undefined' && module.exports) {\n    module.exports = BoardDetector;\n}
