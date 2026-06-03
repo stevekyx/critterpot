@@ -27,296 +27,38 @@ class CritterpotApp {
 
         // Initialize event listeners
         this.initializeEventListeners();
+        
+        // Initial status
+        this.updateStatus('Ready', false);
     }
 
     /**
      * Initialize event listeners
      */
     initializeEventListeners() {
-        document.getElementById('analyzeBtn').addEventListener('click', () => this.analyzeBoardImage());
-        document.getElementById('solveBtn').addEventListener('click', () => this.solveBoard());
-        document.getElementById('clearBoardBtn').addEventListener('click', () => this.editor.clear());
-        document.getElementById('nextStep').addEventListener('click', () => this.nextStep());
-        document.getElementById('prevStep').addEventListener('click', () => this.prevStep());
-        document.getElementById('downloadBtn').addEventListener('click', () => this.downloadSteps());
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const solveBtn = document.getElementById('solveBtn');
+        const clearBoardBtn = document.getElementById('clearBoardBtn');
+        
+        if (analyzeBtn) analyzeBtn.addEventListener('click', () => this.analyzeBoardImage());
+        if (solveBtn) solveBtn.addEventListener('click', () => this.solveBoard());
+        if (clearBoardBtn) clearBoardBtn.addEventListener('click', () => this.editor.clear());
+        
+        const nextBtn = document.getElementById('nextStep');
+        const prevBtn = document.getElementById('prevStep');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if (nextBtn) nextBtn.addEventListener('click', () => this.nextStep());
+        if (prevBtn) prevBtn.addEventListener('click', () => this.prevStep());
+        if (downloadBtn) downloadBtn.addEventListener('click', () => this.downloadSteps());
     }
 
     /**
      * Update status message
      */
     updateStatus(message, isLoading = false) {
-        document.getElementById('statusText').textContent = message;
-        const icon = document.getElementById('statusIcon');
+        const statusText = document.getElementById('statusText');
+        const statusIcon = document.getElementById('statusIcon');
         
-        if (isLoading) {
-            icon.classList.add('loading');
-        } else {
-            icon.classList.remove('loading');
-        }
-    }
-
-    /**
-     * Analyze uploaded board image
-     */
-    async analyzeBoardImage() {
-        const fileInput = document.getElementById('screenshot');
-        const file = fileInput.files[0];
-
-        if (!file) {
-            alert('Please select an image file');
-            return;
-        }
-
-        try {
-            this.updateStatus('Loading image...', true);
-            document.getElementById('analyzeBtn').disabled = true;
-
-            // Allow UI to update
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            this.updateStatus('Analyzing image...', true);
-
-            // Detect board from image
-            this.detector = new BoardDetector();
-            const board = await this.detector.analyzeScreenshot(file);
-
-            // Set the detected board in the editor
-            this.editor.setBoard(board);
-
-            this.updateStatus('Ready to solve', false);
-            
-            // Clear any previous solution
-            document.querySelector('.solution-section').classList.add('hidden');
-        } catch (error) {
-            console.error('Error analyzing image:', error);
-            this.updateStatus('Error: ' + error.message, false);
-        } finally {
-            document.getElementById('analyzeBtn').disabled = false;
-        }
-    }
-
-    /**
-     * Solve the current board
-     */
-    async solveBoard() {
-        const board = this.editor.getBoard();
-
-        // Check if board is empty
-        if (board.every(row => row.every(cell => cell === null))) {
-            alert('Board is empty');
-            return;
-        }
-
-        try {
-            this.updateStatus('Solving board...', true);
-            document.getElementById('solveBtn').disabled = true;
-
-            // Allow UI to update
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            this.solver = new MatchSolver(board);
-            const solution = await this.solveBoardAsync();
-
-            if (solution.success) {
-                this.currentSolution = solution;
-                this.currentStepIndex = 0;
-                this.displaySolution(solution);
-                this.updateStatus('Solution found!', false);
-            } else {
-                this.updateStatus('Board cannot be cleared', false);
-                alert('Board cannot be cleared');
-            }
-        } catch (error) {
-            console.error('Error solving:', error);
-            this.updateStatus('Error solving board', false);
-            alert('Error solving board: ' + error.message);
-        } finally {
-            document.getElementById('solveBtn').disabled = false;
-        }
-    }
-
-    /**
-     * Solve board asynchronously
-     */
-    async solveBoardAsync() {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                try {
-                    const solution = this.solver.findOptimalSolution();
-                    resolve(solution);
-                } catch (error) {
-                    console.error('Solver error:', error);
-                    resolve({ steps: [], moves: -1, success: false });
-                }
-            }, 50);
-        });
-    }
-
-    /**
-     * Display solution
-     */
-    displaySolution(solution) {
-        document.getElementById('movesCount').textContent = solution.moves;
-        
-        // Show solution section
-        const solutionSection = document.querySelector('.solution-section');
-        solutionSection.classList.remove('hidden');
-
-        // Show step controls
-        const stepControls = document.getElementById('stepControls');
-        stepControls.classList.remove('hidden');
-
-        // Show download button
-        document.getElementById('downloadBtn').classList.remove('hidden');
-
-        // Display first step
-        this.displayStep(0);
-    }
-
-    /**
-     * Display specific step
-     */
-    displayStep(stepIndex) {
-        if (!this.currentSolution || stepIndex < 0 || stepIndex > this.currentSolution.steps.length) {
-            return;
-        }
-
-        this.currentStepIndex = stepIndex;
-        let board, matchedTiles;
-
-        if (stepIndex === 0) {
-            // First step shows original board
-            board = this.solver.board;
-            matchedTiles = [];
-        } else {
-            const step = this.currentSolution.steps[stepIndex - 1];
-            board = step.board;
-            matchedTiles = step.matchedTiles;
-        }
-
-        // Draw step
-        this.drawBoard(this.stepCanvas, board, true, matchedTiles);
-
-        // Update step indicator
-        document.getElementById('currentStep').textContent = stepIndex + 1;
-        document.getElementById('stepIndicator').textContent = `Step ${stepIndex + 1}/${this.currentSolution.steps.length + 1}`;
-
-        // Update button states
-        document.getElementById('prevStep').disabled = stepIndex === 0;
-        document.getElementById('nextStep').disabled = stepIndex >= this.currentSolution.steps.length;
-    }
-
-    /**
-     * Go to next step
-     */
-    nextStep() {
-        if (this.currentSolution && this.currentStepIndex < this.currentSolution.steps.length) {
-            this.displayStep(this.currentStepIndex + 1);
-        }
-    }
-
-    /**
-     * Go to previous step
-     */
-    prevStep() {
-        if (this.currentStepIndex > 0) {
-            this.displayStep(this.currentStepIndex - 1);
-        }
-    }
-
-    /**
-     * Draw board on canvas
-     */
-    drawBoard(canvas, board, highlightMatches = false, matchedTiles = []) {
-        const ctx = canvas.getContext('2d');
-        const tileSize = 50;
-        const boardSize = board.length;
-
-        // Set canvas size
-        canvas.width = tileSize * boardSize;
-        canvas.height = tileSize * boardSize;
-
-        // Draw background
-        ctx.fillStyle = '#252d38';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw grid
-        ctx.strokeStyle = '#3a4452';
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= boardSize; i++) {
-            ctx.beginPath();
-            ctx.moveTo(i * tileSize, 0);
-            ctx.lineTo(i * tileSize, canvas.height);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(0, i * tileSize);
-            ctx.lineTo(canvas.width, i * tileSize);
-            ctx.stroke();
-        }
-
-        // Draw tiles
-        const matchedSet = new Set(matchedTiles.map(pos => `${pos[0]},${pos[1]}`));
-
-        for (let r = 0; r < boardSize; r++) {
-            for (let c = 0; c < boardSize; c++) {
-                if (board[r][c] !== null) {
-                    const isMatched = matchedSet.has(`${r},${c}`);
-                    this.drawTile(ctx, c, r, board[r][c], tileSize, isMatched);
-                }
-            }
-        }
-    }
-
-    /**
-     * Draw single tile
-     */
-    drawTile(ctx, col, row, elementId, tileSize, highlight = false) {
-        const x = col * tileSize + 2;
-        const y = row * tileSize + 2;
-        const size = tileSize - 4;
-
-        // Get color for element
-        const colorMap = [
-            '#ff6b6b', '#4ecdc4', '#95e77d', '#ffe66d',
-            '#a78bfa', '#ff8c42', '#ff6b9d', '#00d4ff'
-        ];
-        const color = colorMap[elementId % colorMap.length];
-
-        // Draw tile
-        ctx.fillStyle = highlight ? '#ffff00' : color;
-        ctx.beginPath();
-        ctx.arc(x + size / 2, y + size / 2, size / 2 - 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw highlight border if matched
-        if (highlight) {
-            ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-        } else {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-    }
-
-    /**
-     * Download all steps as images
-     */
-    downloadSteps() {
-        if (!this.currentSolution) return;
-        alert('Download feature coming soon!');
-    }
-}
-
-// Initialize app when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        const app = new CritterpotApp();
-        app.init();
-    });
-} else {
-    const app = new CritterpotApp();
-    app.init();
-}
+        if (statusText) statusText.textContent = message;
+        if (statusIcon) {\n            if (isLoading) {\n                statusIcon.classList.add('loading');\n            } else {\n                statusIcon.classList.remove('loading');\n            }\n        }\n    }\n\n    /**\n     * Analyze uploaded board image\n     */\n    async analyzeBoardImage() {\n        const fileInput = document.getElementById('screenshot');\n        const file = fileInput.files[0];\n\n        if (!file) {\n            alert('Please select an image file');\n            return;\n        }\n\n        try {\n            this.updateStatus('Loading image...', true);\n            const analyzeBtn = document.getElementById('analyzeBtn');\n            if (analyzeBtn) analyzeBtn.disabled = true;\n\n            // Allow UI to update\n            await new Promise(resolve => setTimeout(resolve, 100));\n\n            this.updateStatus('Analyzing image...', true);\n\n            // Detect board from image\n            this.detector = new BoardDetector();\n            const board = await this.detector.analyzeScreenshot(file);\n\n            // Set the detected board in the editor\n            this.editor.setBoard(board);\n\n            this.updateStatus('Ready to solve', false);\n            \n            // Clear any previous solution\n            const solutionSection = document.querySelector('.solution-section');\n            if (solutionSection) solutionSection.classList.add('hidden');\n        } catch (error) {\n            console.error('Error analyzing image:', error);\n            this.updateStatus('Error: ' + error.message, false);\n            alert('Error analyzing image: ' + error.message);\n        } finally {\n            const analyzeBtn = document.getElementById('analyzeBtn');\n            if (analyzeBtn) analyzeBtn.disabled = false;\n        }\n    }\n\n    /**\n     * Solve the current board\n     */\n    async solveBoard() {\n        const board = this.editor.getBoard();\n\n        // Check if board is empty\n        if (board.every(row => row.every(cell => cell === null))) {\n            alert('Board is empty');\n            return;\n        }\n\n        try {\n            this.updateStatus('Solving board...', true);\n            const solveBtn = document.getElementById('solveBtn');\n            if (solveBtn) solveBtn.disabled = true;\n\n            // Allow UI to update\n            await new Promise(resolve => setTimeout(resolve, 100));\n\n            this.solver = new MatchSolver(board);\n            const solution = await this.solveBoardAsync();\n\n            if (solution.success) {\n                this.currentSolution = solution;\n                this.currentStepIndex = 0;\n                this.displaySolution(solution);\n                this.updateStatus('Solution found!', false);\n            } else {\n                this.updateStatus('Board cannot be cleared', false);\n                alert('Board cannot be cleared');\n            }\n        } catch (error) {\n            console.error('Error solving:', error);\n            this.updateStatus('Error solving board', false);\n            alert('Error solving board: ' + error.message);\n        } finally {\n            const solveBtn = document.getElementById('solveBtn');\n            if (solveBtn) solveBtn.disabled = false;\n        }\n    }\n\n    /**\n     * Solve board asynchronously\n     */\n    async solveBoardAsync() {\n        return new Promise((resolve) => {\n            setTimeout(() => {\n                try {\n                    const solution = this.solver.findOptimalSolution();\n                    resolve(solution);\n                } catch (error) {\n                    console.error('Solver error:', error);\n                    resolve({ steps: [], moves: -1, success: false });\n                }\n            }, 50);\n        });\n    }\n\n    /**\n     * Display solution\n     */\n    displaySolution(solution) {\n        const movesCount = document.getElementById('movesCount');\n        if (movesCount) movesCount.textContent = solution.moves;\n        \n        // Show solution section\n        const solutionSection = document.querySelector('.solution-section');\n        if (solutionSection) solutionSection.classList.remove('hidden');\n\n        // Show step controls\n        const stepControls = document.getElementById('stepControls');\n        if (stepControls) stepControls.classList.remove('hidden');\n\n        // Show download button\n        const downloadBtn = document.getElementById('downloadBtn');\n        if (downloadBtn) downloadBtn.classList.remove('hidden');\n\n        // Display first step\n        this.displayStep(0);\n    }\n\n    /**\n     * Display specific step\n     */\n    displayStep(stepIndex) {\n        if (!this.currentSolution || stepIndex < 0 || stepIndex > this.currentSolution.steps.length) {\n            return;\n        }\n\n        this.currentStepIndex = stepIndex;\n        let board, matchedTiles;\n\n        if (stepIndex === 0) {\n            // First step shows original board\n            board = this.solver.board;\n            matchedTiles = [];\n        } else {\n            const step = this.currentSolution.steps[stepIndex - 1];\n            board = step.board;\n            matchedTiles = step.matchedTiles;\n        }\n\n        // Draw step\n        this.drawBoard(this.stepCanvas, board, true, matchedTiles);\n\n        // Update step indicator\n        const currentStep = document.getElementById('currentStep');\n        const stepIndicator = document.getElementById('stepIndicator');\n        \n        if (currentStep) currentStep.textContent = stepIndex + 1;\n        if (stepIndicator) stepIndicator.textContent = `Step ${stepIndex + 1}/${this.currentSolution.steps.length + 1}`;\n\n        // Update button states\n        const prevBtn = document.getElementById('prevStep');\n        const nextBtn = document.getElementById('nextStep');\n        \n        if (prevBtn) prevBtn.disabled = stepIndex === 0;\n        if (nextBtn) nextBtn.disabled = stepIndex >= this.currentSolution.steps.length;\n    }\n\n    /**\n     * Go to next step\n     */\n    nextStep() {\n        if (this.currentSolution && this.currentStepIndex < this.currentSolution.steps.length) {\n            this.displayStep(this.currentStepIndex + 1);\n        }\n    }\n\n    /**\n     * Go to previous step\n     */\n    prevStep() {\n        if (this.currentStepIndex > 0) {\n            this.displayStep(this.currentStepIndex - 1);\n        }\n    }\n\n    /**\n     * Draw board on canvas\n     */\n    drawBoard(canvas, board, highlightMatches = false, matchedTiles = []) {\n        const ctx = canvas.getContext('2d');\n        const tileSize = 50;\n        const boardSize = board.length;\n\n        // Set canvas size\n        canvas.width = tileSize * boardSize;\n        canvas.height = tileSize * boardSize;\n\n        // Draw background\n        ctx.fillStyle = '#252d38';\n        ctx.fillRect(0, 0, canvas.width, canvas.height);\n\n        // Draw grid\n        ctx.strokeStyle = '#3a4452';\n        ctx.lineWidth = 1;\n        for (let i = 0; i <= boardSize; i++) {\n            ctx.beginPath();\n            ctx.moveTo(i * tileSize, 0);\n            ctx.lineTo(i * tileSize, canvas.height);\n            ctx.stroke();\n\n            ctx.beginPath();\n            ctx.moveTo(0, i * tileSize);\n            ctx.lineTo(canvas.width, i * tileSize);\n            ctx.stroke();\n        }\n\n        // Draw tiles\n        const matchedSet = new Set(matchedTiles.map(pos => `${pos[0]},${pos[1]}`));\n\n        for (let r = 0; r < boardSize; r++) {\n            for (let c = 0; c < boardSize; c++) {\n                if (board[r][c] !== null) {\n                    const isMatched = matchedSet.has(`${r},${c}`);\n                    this.drawTile(ctx, c, r, board[r][c], tileSize, isMatched);\n                }\n            }\n        }\n    }\n\n    /**\n     * Draw single tile\n     */\n    drawTile(ctx, col, row, elementId, tileSize, highlight = false) {\n        const x = col * tileSize + 2;\n        const y = row * tileSize + 2;\n        const size = tileSize - 4;\n\n        // Get color for element\n        const colorMap = [\n            '#ff6b6b', '#4ecdc4', '#95e77d', '#ffe66d',\n            '#a78bfa', '#ff8c42', '#ff6b9d', '#00d4ff'\n        ];\n        const color = colorMap[elementId % colorMap.length];\n\n        // Draw tile\n        ctx.fillStyle = highlight ? '#ffff00' : color;\n        ctx.beginPath();\n        ctx.arc(x + size / 2, y + size / 2, size / 2 - 2, 0, Math.PI * 2);\n        ctx.fill();\n\n        // Draw highlight border if matched\n        if (highlight) {\n            ctx.strokeStyle = '#ff0000';\n            ctx.lineWidth = 3;\n            ctx.stroke();\n        } else {\n            ctx.strokeStyle = '#fff';\n            ctx.lineWidth = 1;\n            ctx.stroke();\n        }\n    }\n\n    /**\n     * Download all steps as images\n     */\n    downloadSteps() {\n        if (!this.currentSolution) return;\n        alert('Download feature coming soon!');\n    }\n}\n\n// Initialize app when DOM is ready\nif (document.readyState === 'loading') {\n    document.addEventListener('DOMContentLoaded', () => {\n        const app = new CritterpotApp();\n        app.init();\n    });\n} else {\n    const app = new CritterpotApp();\n    app.init();\n}
