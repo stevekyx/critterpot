@@ -12,66 +12,51 @@ class CritterpotApp {
         this.currentStepIndex = 0;
         this.boardCanvas = null;
         this.stepCanvas = null;
-        this.tileColors = {};
     }
 
     /**
      * Initialize application
      */
     init() {
-        this.initializeCanvases();
-        this.initializeEventListeners();
-        this.editor = new BoardEditor();
-        this.editor.init('editorCanvas', 'elementSelect');
-    }
-
-    /**
-     * Initialize canvas elements
-     */
-    initializeCanvases() {
         this.boardCanvas = document.getElementById('boardCanvas');
         this.stepCanvas = document.getElementById('stepCanvas');
+        
+        // Initialize board editor
+        this.editor = new BoardEditor();
+        this.editor.init('boardCanvas', 'elementSelect');
+
+        // Initialize event listeners
+        this.initializeEventListeners();
     }
 
     /**
      * Initialize event listeners
      */
     initializeEventListeners() {
-        // Solver tab
         document.getElementById('analyzeBtn').addEventListener('click', () => this.analyzeBoardImage());
+        document.getElementById('solveBtn').addEventListener('click', () => this.solveBoard());
+        document.getElementById('clearBoardBtn').addEventListener('click', () => this.editor.clear());
         document.getElementById('nextStep').addEventListener('click', () => this.nextStep());
         document.getElementById('prevStep').addEventListener('click', () => this.prevStep());
         document.getElementById('downloadBtn').addEventListener('click', () => this.downloadSteps());
-
-        // Editor tab
-        document.getElementById('clearEditorBtn').addEventListener('click', () => this.editor.clear());
-        document.getElementById('solveEditorBtn').addEventListener('click', () => this.solveEditorBoard());
-
-        // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
-        });
     }
 
     /**
-     * Switch between tabs
+     * Update status message
      */
-    switchTab(tabName) {
-        // Hide all tabs
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-
-        // Show selected tab
-        document.getElementById(tabName).classList.add('active');
-        event.target.classList.add('active');
+    updateStatus(message, isLoading = false) {
+        document.getElementById('statusText').textContent = message;
+        const icon = document.getElementById('statusIcon');
+        
+        if (isLoading) {
+            icon.classList.add('loading');
+        } else {
+            icon.classList.remove('loading');
+        }
     }
 
     /**
-     * Analyze uploaded board image (with async processing)
+     * Analyze uploaded board image
      */
     async analyzeBoardImage() {
         const fileInput = document.getElementById('screenshot');
@@ -83,59 +68,78 @@ class CritterpotApp {
         }
 
         try {
-            this.updateStatus('Loading image...');
+            this.updateStatus('Loading image...', true);
             document.getElementById('analyzeBtn').disabled = true;
 
-            // Load image with delay to allow UI update
+            // Allow UI to update
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            this.updateStatus('Analyzing image...');
-            
-            // Detect board from image (async with chunks)
+            this.updateStatus('Analyzing image...', true);
+
+            // Detect board from image
             this.detector = new BoardDetector();
             const board = await this.detector.analyzeScreenshot(file);
 
-            this.updateStatus('Rendering board...');
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Set the detected board in the editor
+            this.editor.setBoard(board);
 
-            // Store element colors for visualization
-            const elements = this.detector.getElements();
-            elements.forEach((el, idx) => {
-                this.tileColors[idx] = el.color;
-            });
-
-            // Draw original board
-            this.drawBoard(this.boardCanvas, board, false);
-
-            // Solve the board
-            this.updateStatus('Solving board (this may take a moment)...');
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            this.solver = new MatchSolver(board);
-            const solution = await this.solveBoardAsync(board);
-
-            if (solution.success) {
-                this.currentSolution = solution;
-                this.currentStepIndex = 0;
-                this.displaySolution(solution);
-            } else {
-                this.updateStatus('Board cannot be cleared');
-                document.getElementById('movesCount').textContent = 'N/A';
-            }
+            this.updateStatus('Ready to solve', false);
+            
+            // Clear any previous solution
+            document.querySelector('.solution-section').classList.add('hidden');
         } catch (error) {
             console.error('Error analyzing image:', error);
-            this.updateStatus('Error: ' + error.message);
+            this.updateStatus('Error: ' + error.message, false);
         } finally {
             document.getElementById('analyzeBtn').disabled = false;
         }
     }
 
     /**
-     * Solve board asynchronously to avoid UI freezing
+     * Solve the current board
      */
-    async solveBoardAsync(board) {
+    async solveBoard() {
+        const board = this.editor.getBoard();
+
+        // Check if board is empty
+        if (board.every(row => row.every(cell => cell === null))) {
+            alert('Board is empty');
+            return;
+        }
+
+        try {
+            this.updateStatus('Solving board...', true);
+            document.getElementById('solveBtn').disabled = true;
+
+            // Allow UI to update
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            this.solver = new MatchSolver(board);
+            const solution = await this.solveBoardAsync();
+
+            if (solution.success) {
+                this.currentSolution = solution;
+                this.currentStepIndex = 0;
+                this.displaySolution(solution);
+                this.updateStatus('Solution found!', false);
+            } else {
+                this.updateStatus('Board cannot be cleared', false);
+                alert('Board cannot be cleared');
+            }
+        } catch (error) {
+            console.error('Error solving:', error);
+            this.updateStatus('Error solving board', false);
+            alert('Error solving board: ' + error.message);
+        } finally {
+            document.getElementById('solveBtn').disabled = false;
+        }
+    }
+
+    /**
+     * Solve board asynchronously
+     */
+    async solveBoardAsync() {
         return new Promise((resolve) => {
-            // Run solver in next event loop iteration
             setTimeout(() => {
                 try {
                     const solution = this.solver.findOptimalSolution();
@@ -153,7 +157,10 @@ class CritterpotApp {
      */
     displaySolution(solution) {
         document.getElementById('movesCount').textContent = solution.moves;
-        this.updateStatus('Solution found!');
+        
+        // Show solution section
+        const solutionSection = document.querySelector('.solution-section');
+        solutionSection.classList.remove('hidden');
 
         // Show step controls
         const stepControls = document.getElementById('stepControls');
@@ -295,60 +302,11 @@ class CritterpotApp {
     }
 
     /**
-     * Solve the board from manual editor
-     */
-    async solveEditorBoard() {
-        const board = this.editor.getBoard();
-
-        // Check if board is empty
-        if (board.every(row => row.every(cell => cell === null))) {
-            alert('Board is empty');
-            return;
-        }
-
-        // Solve
-        try {
-            this.updateStatus('Solving board...');
-            this.solver = new MatchSolver(board);
-            const solution = await this.solveBoardAsync(board);
-
-            if (solution.success) {
-                this.currentSolution = solution;
-                this.currentStepIndex = 0;
-
-                // Switch to solver tab and display results
-                document.getElementById('solver').classList.add('active');
-                document.getElementById('editor').classList.remove('active');
-                document.querySelectorAll('.tab-btn')[0].classList.add('active');
-                document.querySelectorAll('.tab-btn')[1].classList.remove('active');
-
-                // Draw board
-                this.drawBoard(this.boardCanvas, board, false);
-                this.displaySolution(solution);
-            } else {
-                alert('Board cannot be cleared');
-            }
-        } catch (error) {
-            console.error('Error solving:', error);
-            alert('Error solving board: ' + error.message);
-        }
-    }
-
-    /**
      * Download all steps as images
      */
     downloadSteps() {
         if (!this.currentSolution) return;
-
         alert('Download feature coming soon!');
-        // TODO: Implement zip download of step images
-    }
-
-    /**
-     * Update status message
-     */
-    updateStatus(message) {
-        document.getElementById('status').textContent = message;
     }
 }
 

@@ -8,34 +8,54 @@
 </head>
 <body>
     <div class="container">
+        <!-- Status Bar (Top) -->
+        <div id="statusBar" class="status-bar">
+            <div class="status-content">
+                <div id="statusIcon" class="status-icon"></div>
+                <span id="statusText">Ready</span>
+            </div>
+        </div>
+
         <header>
             <h1>🐛 Critterpot</h1>
             <p>Find the optimal moves to clear the board</p>
         </header>
 
-        <nav class="tabs">
-            <button class="tab-btn active" data-tab="solver">Solver</button>
-            <button class="tab-btn" data-tab="editor">Manual Editor</button>
-        </nav>
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <label for="screenshot">Upload Screenshot:</label>
+            <input type="file" id="screenshot" accept="image/*">
+            <button id="analyzeBtn">Analyze Board</button>
+        </div>
 
-        <!-- Solver Tab -->
-        <section id="solver" class="tab-content active">
-            <div class="upload-section">
-                <label for="screenshot">Upload Screenshot:</label>
-                <input type="file" id="screenshot" accept="image/*">
-                <button id="analyzeBtn">Analyze Board</button>
-            </div>
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Board Editor Section -->
+            <section class="board-section">
+                <div class="board-header">
+                    <h2>Board</h2>
+                    <div class="board-actions">
+                        <label for="elementSelect">Element:</label>
+                        <select id="elementSelect">
+                            <option value="">None (Empty)</option>
+                        </select>
+                        <button id="clearBoardBtn" class="secondary-btn">Clear All</button>
+                        <button id="solveBtn">Solve</button>
+                    </div>
+                </div>
+                <div class="board-display">
+                    <canvas id="boardCanvas"></canvas>
+                </div>
+                <div class="board-info">
+                    <p>Click tiles to place/remove elements</p>
+                </div>
+            </section>
 
-            <div class="board-display">
-                <h2>Original Board</h2>
-                <canvas id="boardCanvas"></canvas>
-            </div>
-
-            <div class="solution-section">
+            <!-- Solution Section -->
+            <section class="solution-section hidden">
                 <h2>Solution</h2>
                 <div id="solutionStats">
                     <p>Moves needed: <span id="movesCount">-</span></p>
-                    <p>Status: <span id="status">Ready</span></p>
                 </div>
 
                 <div id="stepControls" class="hidden">
@@ -50,38 +70,13 @@
                 </div>
 
                 <button id="downloadBtn" class="hidden">Download All Steps</button>
-            </div>
-        </section>
-
-        <!-- Manual Editor Tab -->
-        <section id="editor" class="tab-content">
-            <div class="editor-section">
-                <h2>Manual Board Editor</h2>
-                <div class="editor-controls">
-                    <div>
-                        <label for="elementSelect">Select Element:</label>
-                        <select id="elementSelect">
-                            <option value="">None (Empty)</option>
-                        </select>
-                    </div>
-                    <button id="clearEditorBtn">Clear All</button>
-                    <button id="solveEditorBtn">Solve This Board</button>
-                </div>
-
-                <div class="editor-board">
-                    <canvas id="editorCanvas"></canvas>
-                </div>
-
-                <div class="editor-info">
-                    <p>Click tiles to place/remove elements</p>
-                </div>
-            </div>
-        </section>
+            </section>
+        </div>
     </div>
 
     <script src="solver.js"></script>
-    <script src="editor.js"></script>
     <script src="boardDetection.js"></script>
+    <script src="boardEditor.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
