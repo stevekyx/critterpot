@@ -71,7 +71,7 @@ class CritterpotApp {
     }
 
     /**
-     * Analyze uploaded board image
+     * Analyze uploaded board image (with async processing)
      */
     async analyzeBoardImage() {
         const fileInput = document.getElementById('screenshot');
@@ -83,11 +83,20 @@ class CritterpotApp {
         }
 
         try {
-            this.updateStatus('Analyzing image...');
+            this.updateStatus('Loading image...');
+            document.getElementById('analyzeBtn').disabled = true;
 
-            // Detect board from image
+            // Load image with delay to allow UI update
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            this.updateStatus('Analyzing image...');
+            
+            // Detect board from image (async with chunks)
             this.detector = new BoardDetector();
             const board = await this.detector.analyzeScreenshot(file);
+
+            this.updateStatus('Rendering board...');
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Store element colors for visualization
             const elements = this.detector.getElements();
@@ -99,9 +108,11 @@ class CritterpotApp {
             this.drawBoard(this.boardCanvas, board, false);
 
             // Solve the board
-            this.updateStatus('Solving...');
+            this.updateStatus('Solving board (this may take a moment)...');
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             this.solver = new MatchSolver(board);
-            const solution = this.solver.findOptimalSolution();
+            const solution = await this.solveBoardAsync(board);
 
             if (solution.success) {
                 this.currentSolution = solution;
@@ -114,7 +125,27 @@ class CritterpotApp {
         } catch (error) {
             console.error('Error analyzing image:', error);
             this.updateStatus('Error: ' + error.message);
+        } finally {
+            document.getElementById('analyzeBtn').disabled = false;
         }
+    }
+
+    /**
+     * Solve board asynchronously to avoid UI freezing
+     */
+    async solveBoardAsync(board) {
+        return new Promise((resolve) => {
+            // Run solver in next event loop iteration
+            setTimeout(() => {
+                try {
+                    const solution = this.solver.findOptimalSolution();
+                    resolve(solution);
+                } catch (error) {
+                    console.error('Solver error:', error);
+                    resolve({ steps: [], moves: -1, success: false });
+                }
+            }, 50);
+        });
     }
 
     /**
@@ -218,7 +249,7 @@ class CritterpotApp {
         }
 
         // Draw tiles
-        const matchedSet = new Set(matchedTiles.map(pos => `${pos[0]},${pos[1]}>`));
+        const matchedSet = new Set(matchedTiles.map(pos => `${pos[0]},${pos[1]}`));
 
         for (let r = 0; r < boardSize; r++) {
             for (let c = 0; c < boardSize; c++) {
@@ -266,7 +297,7 @@ class CritterpotApp {
     /**
      * Solve the board from manual editor
      */
-    solveEditorBoard() {
+    async solveEditorBoard() {
         const board = this.editor.getBoard();
 
         // Check if board is empty
@@ -279,7 +310,7 @@ class CritterpotApp {
         try {
             this.updateStatus('Solving board...');
             this.solver = new MatchSolver(board);
-            const solution = this.solver.findOptimalSolution();
+            const solution = await this.solveBoardAsync(board);
 
             if (solution.success) {
                 this.currentSolution = solution;
