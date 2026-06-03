@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Critterpot - Match Drop Solver</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐛 Critterpot</h1>
+            <p>Find the optimal moves to clear the board</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="solver">Solver</button>
+            <button class="tab-btn" data-tab="editor">Manual Editor</button>
+        </nav>
+
+        <!-- Solver Tab -->
+        <section id="solver" class="tab-content active">
+            <div class="upload-section">
+                <label for="screenshot">Upload Screenshot:</label>
+                <input type="file" id="screenshot" accept="image/*">
+                <button id="analyzeBtn">Analyze Board</button>
+            </div>
+
+            <div class="board-display">
+                <h2>Original Board</h2>
+                <canvas id="boardCanvas"></canvas>
+            </div>
+
+            <div class="solution-section">
+                <h2>Solution</h2>
+                <div id="solutionStats">
+                    <p>Moves needed: <span id="movesCount">-</span></p>
+                    <p>Status: <span id="status">Ready</span></p>
+                </div>
+
+                <div id="stepControls" class="hidden">
+                    <button id="prevStep">← Previous</button>
+                    <span id="stepIndicator">Step 0/0</span>
+                    <button id="nextStep">Next →</button>
+                </div>
+
+                <div class="step-display">
+                    <h3>Step <span id="currentStep">1</span></h3>
+                    <canvas id="stepCanvas"></canvas>
+                </div>
+
+                <button id="downloadBtn" class="hidden">Download All Steps</button>
+            </div>
+        </section>
+
+        <!-- Manual Editor Tab -->
+        <section id="editor" class="tab-content">
+            <div class="editor-section">
+                <h2>Manual Board Editor</h2>
+                <div class="editor-controls">
+                    <div>
+                        <label for="elementSelect">Select Element:</label>
+                        <select id="elementSelect">
+                            <option value="">None (Empty)</option>
+                        </select>
+                    </div>
+                    <button id="clearEditorBtn">Clear All</button>
+                    <button id="solveEditorBtn">Solve This Board</button>
+                </div>
+
+                <div class="editor-board">
+                    <canvas id="editorCanvas"></canvas>
+                </div>
+
+                <div class="editor-info">
+                    <p>Click tiles to place/remove elements</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="solver.js"></script>
+    <script src="editor.js"></script>
+    <script src="boardDetection.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
